@@ -1,0 +1,241 @@
+docker 容器数据卷：
+
+运行：
+
+```
+docker run -it -v /myDataVolume:/dataVolumeContainer:rw  centos
+```
+
+检查：
+```
+[root@bogon /]# docker ps
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+155fbd7fe0c1        centos              "/bin/bash"         7 minutes ago       Up 7 minutes                            laughing_cray
+[root@bogon /]# docker inspect 155fbd7fe0c1
+```
+
+出现以下东东表示成功绑定：
+```
+"Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/myDataVolume",
+                "Destination": "/dataVolumeContainer",
+                "Mode": "",
+                "RW": true,
+                "Propagation": "rprivate"
+            }
+```
+
+
+## Docker -v 对挂载的目录没有权限 Permission denied
+> 解决方法：
+
+运行时: --privileged=true 
+
+docker run -it -v /myDataVolume:/dataVolumeContainer:rw --privil
+eged=true centos
+
+
+
+docker容器数据卷使用DockerFile：
+
+```
+mkdir /mydocker
+cd mydocker
+vi DockerFile
+```
+
+DckerFile：内容
+
+＃volume test
+FROM centos
+VOLUME ["/dataVolumeContainer1", /dataVolumeContainer2]
+CMD echo "finished, ---------------success"
+CMD /bin/bash                   
+
+
+使用 build 构建自定义镜像：
+
+docker build -f /mydocker/Dockerfile -t aqqje/centos .
+
+mv DockerFile Dockerfile ： 文件修改名称： DockerFile ==》 Dockerfile
+
+
+
+目录下的结构，项目的jar包和Dockerfile文件必须放在同一目录（以后研究是否可以分开放，名字是否可以更改），文件名字必须为Dockerfile。否则执行的时候可能会报一下异常：
+
+unable to prepare context: unable to evaluate symlinks in Dockerfile path: lstat /mydocker/Dockerfile: no such file or directory
+
+进入正在运行的容器：
+
+sudo docker attach cb98e0e1b868
+
+
+容器卷的继承：
+
+--volumes-from [container]
+
+
+```
+docker run -it --name dc01 aqqje/centos  # 父容器
+docker run -it --name dc02 --volumes-from dc01 aqqje/centos # 02 子容器并继承父容器的容器卷
+docker run -it --name dc03 --volumes-from dc01 aqqje/centos 
+```
+
+指令： crt + p + q  ==> 结束不退出！
+指令： pwd ==> 显示整个路径名
+指令： ll  ==> 列出来的结果详细
+指令： docker history [images]查看指定镜像的创建历史
+指令： curl http://www.baidu.com ==> 返回当前网址的form表单
+指令： cp Dockerfile2 Dockerfile3 ==>从Dockerfile2复制一份Dockerfile3
+指令： mkdir -p /aqqje/mydockerfile/tomcat9 ==> mkdir -p 创建多级目录
+指令: wget  -O  jdk-7u79-linux-x64.gz   http://download.oracle.com/otn-pub/java/jdk/7u79-b15/jdk-7u79-linux-x64.tar.gz?AuthParam=1480483544_0062bdc09e770901e37faba50ea8841e ==> 下载文件
+
+
+DockerFile 案例：
+
+FROM centos
+MAINTAINER aqqje<1042136232@qq.com>
+
+ENV MYPATH /tmp
+
+WORKDIR $MYPATH
+
+RUN yum -y install vim
+RUM yum -y install net-tools
+
+EXPOSE 80
+
+CMD echo $MYPATH
+CMD echo "success--------------------------->ok"
+CMD /bin/bash
+
+
+## 自定义tomcat9 
+
+Dockerfiler:
+
+[root@t-docker tomcat9]# cat Dockerfile 
+FROM centos
+MAINTAINER aqqje
+#把宿主机当前上下文的c.txt拷贝到容器/opt路径下
+COPY c.txt /opt/container.txt
+#用ADD指令把java和tomcat压缩包添加到容器中，并自动解压
+ADD apache-tomcat-9.0.12.tar.gz /opt
+ADD jdk-8u181-linux-x64.tar.gz /opt
+#安装vim编辑器
+RUN yum -y install vim
+#设置工作访问时候的WORKDIR路径，登录落脚点
+ENV MYPATH /opt
+WORKDIR $MYPATH
+#配置java与tomcat环境变量
+ENV JAVA_HOME /opt/jdk1.8.0_181
+ENV CLASSPATH $JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+ENV CATALINA_HOME /opt/apache-tomcat-9.0.12
+ENV CATALINA_BASE /opt/apache-tomcat-9.0.12
+ENV PATH $PATH:$JAVA_HOME/bin:$CATALINA_HOME/lib:$CATALINA_HOME/bin
+#容器运行时监听的端口
+EXPOSE 8080
+#启动时运行tomcat
+#ENTRYPOINT ["/opt/apache-tomcat-9.0.12/bin/startup.sh"]
+#CMD ["/opt/apache-tomcat-9.0.12/bin/catalina.sh","run"]
+CMD /opt/apache-tomcat-9.0.12/bin/startup.sh && tail -F /opt/apache-tomcat-9.0.12/logs/catalina.out
+
+
+# 构建镜像
+
+docker build -t omtomcat9
+
+# 运行镜像
+
+docker run -d -p 9080:8080 --name myty9 -v /aqqje/tomcat/test:/usr/local/apache-tomcat-9.0.12/webapps/test -v /aqqje/tomcat/tomcat9log:/usr/local/apache-tomcat-9.0.12/logs --privileged=true 5ecad6f62471
+
+
+
+CentOS 7.0默认使用的是firewall作为防火墙
+
+关闭firewall：
+systemctl stop firewalld.service #停止firewall
+systemctl disable firewalld.service #禁止firewall开机启动
+firewall-cmd --state #查看默认防火墙状态（关闭后显示notrunning，开启后显示running）
+
+
+将centos设置iptables防火墙
+
+iptables防火墙（这里iptables已经安装，下面进行配置）
+vi/etc/sysconfig/iptables #编辑防火墙配置文件
+# sampleconfiguration for iptables service
+# you can edit thismanually or use system-config-firewall
+# please do not askus to add additional ports/services to this default configuration
+*filter
+:INPUT ACCEPT [0:0]
+:FORWARD ACCEPT[0:0]
+:OUTPUT ACCEPT[0:0]
+-A INPUT -m state--state RELATED,ESTABLISHED -j ACCEPT
+-A INPUT -p icmp -jACCEPT
+-A INPUT -i lo -jACCEPT
+-A INPUT -p tcp -mstate --state NEW -m tcp --dport 22 -j ACCEPT
+-A INPUT -p tcp -m state --state NEW -m tcp --dport 80 -jACCEPT
+-A INPUT -p tcp -m state --state NEW -m tcp --dport 8080-j ACCEPT
+-A INPUT -j REJECT--reject-with icmp-host-prohibited
+-A FORWARD -jREJECT --reject-with icmp-host-prohibited
+COMMIT
+:wq! #保存退出
+
+
+备注：这里使用80和8080端口为例。***部分一般添加到“-A INPUT -p tcp -m state --state NEW -m tcp--dport 22 -j ACCEPT”行的上面或者下面，切记不要添加到最后一行，否则防火墙重启后不生效。
+systemctlrestart iptables.service #最后重启防火墙使配置生效
+systemctlenable iptables.service #设置防火墙开机启动
+
+自定义tomcat演示发布：
+
+web.xml
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xmlns="http://java.sun.com/xml/ns/javaee"
+         xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_3_0.xsd"
+         id="WebApp_ID" version="3.0">
+ </web-app>
+```
+index.jsp
+
+```
+<?xml version="1.0" encoding="UTF-8"?>  
+   
+<web-app xmlns="http://java.sun.com/xml/ns/javaee"  
+   
+xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"  
+   
+xsi:schemaLocation="http://java.sun.com/xml/ns/javaee http://java.sun.com/xml/ns/javaee/web-app_2_5.xsd"  
+   
+version="2.5">  
+   <display-name>test<display-name>
+</web-app> 
+```
+
+安装mysql :
+
+docker pull mysql
+
+docker run -p 12345:3306 --name mysql -v /aqqje/mysql/conf:/etc/mysql/conf.d -v /aqqje/mysql/logs:/logs -v /aqqje/mysql/data:/var/lib/mysql -e MYSQL_ROOT_PASSWORD=123456 -d mysql:5.6
+
+将本地镜像push到阿里支
+
+提交生成一个新的镜像（a9a274ce4f7b 运行中的镜像）
+
+docker commit -a aqqje -m "test push" a9a274ce4f7b testcentos:1.1
+
+
+$ sudo docker login --username=13548522461 registry.cn-hangzhou.aliyuncs.com
+$ sudo docker tag [ImageId] registry.cn-hangzhou.aliyuncs.com/aqqje/testcentos:[镜像版本号]
+$ sudo docker push registry.cn-hangzhou.aliyuncs.com/aqqje/testcentos:[镜像版本号]
+
+
+
+
+
+
+
+
